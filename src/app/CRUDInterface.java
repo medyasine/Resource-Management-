@@ -17,6 +17,8 @@ public class CRUDInterface extends JFrame {
     private final DefaultTableModel categoryTableModel;
     private final CardLayout cardLayout;
     private final JPanel mainPanel;
+    private final JComboBox<String> categoryFilter;
+    private final JPanel filterPanel;
 
     // Controller instances
     private final ProductController productController;
@@ -39,6 +41,27 @@ public class CRUDInterface extends JFrame {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
+        // Initialize category filter components
+        categoryFilter = new JComboBox<>();
+        categoryFilter.addItem("All Categories"); // Add default option
+        filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.add(new JLabel("Filter by Category: "));
+        filterPanel.add(categoryFilter);
+        filterPanel.setVisible(false); // Initially hidden
+
+        // Add action listener to category filter
+        categoryFilter.addActionListener(e -> {
+            String selectedCategory = (String) categoryFilter.getSelectedItem();
+            if (selectedCategory != null) {
+                if (selectedCategory.equals("All Categories")) {
+                    loadProducts();
+                } else {
+                    List<Product> filteredProducts = productController.getProductsByCategory(selectedCategory);
+                    updateProductTable(filteredProducts);
+                }
+            }
+        });
+
         // Create product panel
         JPanel productPanel = new JPanel(new BorderLayout());
         productPanel.add(new JScrollPane(productTable), BorderLayout.CENTER);
@@ -54,26 +77,34 @@ public class CRUDInterface extends JFrame {
         mainPanel.add(categoryPanel, "Category");
 
         // Create navigation panel
-        JPanel navigationPanel = new JPanel();
+        JPanel navigationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton productViewButton = new JButton("View Products");
         JButton categoryViewButton = new JButton("View Categories");
         navigationPanel.add(productViewButton);
         navigationPanel.add(categoryViewButton);
 
+        // Create top panel to hold navigation and filter
+        JPanel topPanel = new JPanel();
+        topPanel.add(navigationPanel);
+        topPanel.add(filterPanel);
+
         // Set up button actions for navigation
         productViewButton.addActionListener(e -> {
             cardLayout.show(mainPanel, "Product");
+            filterPanel.setVisible(true);
             loadProducts();
+            updateCategoryFilter(); // Refresh category filter options
         });
 
         categoryViewButton.addActionListener(e -> {
             cardLayout.show(mainPanel, "Category");
+            filterPanel.setVisible(false);
             loadCategories();
         });
 
         // Add panels to frame
         setLayout(new BorderLayout());
-        add(navigationPanel, BorderLayout.NORTH);
+        add(topPanel, BorderLayout.NORTH);
         add(mainPanel, BorderLayout.CENTER);
 
         // Window settings
@@ -81,6 +112,33 @@ public class CRUDInterface extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+        // Initial load of categories for the filter
+        updateCategoryFilter();
+    }
+
+    // New method to update category filter options
+    private void updateCategoryFilter() {
+        categoryFilter.removeAllItems();
+        categoryFilter.addItem("All Categories");
+        List<Category> categories = categoryController.getAllCategories();
+        for (Category category : categories) {
+            categoryFilter.addItem(category.getTitre());
+        }
+    }
+
+    // New method to update product table with filtered results
+    private void updateProductTable(List<Product> products) {
+        productTableModel.setRowCount(0);  // Clear existing rows
+        for (Product product : products) {
+            productTableModel.addRow(new Object[]{
+                    product.getId(),
+                    product.getDestination(),
+                    product.getPrix(),
+                    product.getQuantite(),
+                    product.getSdr(),
+                    product.getCategory() != null ? product.getCategory().getId() : "No Category"
+            });
+        }
     }
 
     // Load products into the product table
@@ -98,6 +156,19 @@ public class CRUDInterface extends JFrame {
             });
         }
     }
+
+    private void loadCategories() {
+        categoryTableModel.setRowCount(0);
+        List<Category> categories = categoryController.getAllCategories();
+        for (Category category : categories) {
+            categoryTableModel.addRow(new Object[]{
+                    category.getId(),
+                    category.getTitre(),
+                    category.getDescription()
+            });
+        }
+    }
+
     private JPanel createButtonPanel(String resourceType) {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
 
@@ -113,7 +184,10 @@ public class CRUDInterface extends JFrame {
 
         // Add action listeners to buttons
         if (resourceType.equals("Product")) {
-            refreshButton.addActionListener(e -> loadProducts());
+            refreshButton.addActionListener(e -> {
+                loadProducts();
+                categoryFilter.setSelectedIndex(0);
+            });
         } else if (resourceType.equals("Category")) {
             refreshButton.addActionListener(e -> loadCategories());
         }
@@ -292,20 +366,6 @@ public class CRUDInterface extends JFrame {
 
         return buttonPanel;
     }
-
-
-    private void loadCategories() {
-        categoryTableModel.setRowCount(0);
-        List<Category> categories = categoryController.getAllCategories();
-        for (Category category : categories) {
-            categoryTableModel.addRow(new Object[]{
-                    category.getId(),
-                    category.getTitre(),
-                    category.getDescription()
-            });
-        }
-    }
-
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             CRUDInterface view = new CRUDInterface();
